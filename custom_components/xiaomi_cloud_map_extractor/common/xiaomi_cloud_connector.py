@@ -19,10 +19,11 @@ _LOGGER = logging.getLogger(__name__)
 # noinspection PyBroadException
 class XiaomiCloudConnector:
 
-    def __init__(self, username: str, password: str):
+    def __init__(self, username: str, password: str, device_id: str):
         self.two_factor_auth_url = None
         self._username = username
         self._password = password
+        self._config_device_id = device_id
         self._agent = self.generate_agent()
         self._device_id = self.generate_device_id()
         self._session = requests.session()
@@ -129,7 +130,7 @@ class XiaomiCloudConnector:
                 response = None
             if response is not None and response.status_code == 200:
                 return response.content
-        return None
+        return None   
 
     def get_device_details(self, token: str,
                            country: str) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
@@ -137,22 +138,61 @@ class XiaomiCloudConnector:
         if country is not None:
             countries_to_check = [country]
         for country in countries_to_check:
-            devices = self.get_devices(country)
-            if devices is None:
-                continue
-            found = list(filter(lambda d: str(d["token"]).casefold() == str(token).casefold(),
-                                devices["result"]["list"]))
-            if len(found) > 0:
-                user_id = found[0]["uid"]
-                device_id = found[0]["did"]
-                model = found[0]["model"]
-                return country, user_id, device_id, model
+
+            hh = []
+            homes = self.get_homes(country)
+            if homes is not None:
+                for h in homes['result']['homelist']:
+                    hh.append({'home_id': h['id'], 'home_owner': self._userId})
+            dev_cnt = self.get_dev_cnt(country)
+            if dev_cnt is not None:
+                for h in dev_cnt["result"]["share"]["share_family"]:
+                    hh.append({'home_id': h['home_id'], 'home_owner': h['home_owner']})
+
+            if len(hh) == 0:
+                print(f'No homes found for server "{country}".')
+                continue   
+
+            for home in hh:
+                devices = self.get_devices(country, home['home_id'], home['home_owner'])
+
+                if devices is None or devices["result"]['device_info'] is None:
+                    continue
+                found = list(filter(lambda d: str(d["token"]).casefold() == str(token).casefold(),
+                                    devices["result"]["device_info"]))
+                if len(found) > 0 and found[0]["did"] == self._config_device_id:
+                    user_id = found[0]["uid"]
+                    device_id = found[0]["did"]
+                    model = found[0]["model"]
+                    return country, user_id, device_id, model
         return None, None, None, None
 
     def get_devices(self, country: str) -> Any:
         url = self.get_api_url(country) + "/home/device_list"
         params = {
             "data": '{"getVirtualModel":false,"getHuamiDevices":0}'
+        }
+        return self.execute_api_call_encrypted(url, params)
+    
+    def get_dev_cnt(self, country):
+        url = self.get_api_url(country) + "/v2/user/get_device_cnt"
+        params = {
+            "data": '{ "fetch_own": true, "fetch_share": true}'
+        }
+        return self.execute_api_call_encrypted(url, params)
+
+    def get_homes(self, country):
+            url = self.get_api_url(country) + "/v2/homeroom/gethome"
+            params = {
+                "data": '{"fg": true, "fetch_share": true, "fetch_share_dev": true, "limit": 300, "app_ver": 7}'}
+            return self.execute_api_call_encrypted(url, params)
+
+    def get_devices(self, country, home_id, owner_id):
+        url = self.get_api_url(country) + "/v2/home/home_device_list"
+        params = {
+            "data": '{"home_owner": ' + str(owner_id) +
+            ',"home_id": ' + str(home_id) +
+            ',  "limit": 200,  "get_split_device": true, "support_smart_home": true}'
         }
         return self.execute_api_call_encrypted(url, params)
 

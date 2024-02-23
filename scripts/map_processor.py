@@ -4,7 +4,11 @@ import os
 
 import yaml
 from homeassistant import config_entries  # to fix circular imports
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_TOKEN, CONF_USERNAME
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_TOKEN, CONF_USERNAME, CONF_DEVICE_ID
+
+# import os, sys
+# CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+# sys.path.append(os.path.dirname(CURRENT_DIR))
 
 from custom_components.xiaomi_cloud_map_extractor.camera import PLATFORM_SCHEMA, VacuumCamera
 from custom_components.xiaomi_cloud_map_extractor.const import *
@@ -32,6 +36,7 @@ def open_and_validate_config(filename) -> dict:
 def create_camera(config: dict, output_dir: str) -> VacuumCamera:
     host = config[CONF_HOST]
     token = config[CONF_TOKEN]
+    device_id = config[CONF_DEVICE_ID]
     username = config[CONF_USERNAME]
     password = config[CONF_PASSWORD]
     country = config[CONF_COUNTRY]
@@ -47,7 +52,7 @@ def create_camera(config: dict, output_dir: str) -> VacuumCamera:
         drawables = CONF_AVAILABLE_DRAWABLES[1:]
     attributes = CONF_AVAILABLE_ATTRIBUTES
     force_api = config[CONF_FORCE_API]
-    return VacuumCamera("", host, token, username, password, country, "", False, image_config, colors, drawables, sizes,
+    return VacuumCamera("", host, token, device_id, username, password, country, "", False, image_config, colors, drawables, sizes,
                         texts, attributes, True, True, output_dir, force_api)
 
 
@@ -130,6 +135,8 @@ def run_test(map_config, test_dir):
             parse_map_file(map_config, file, api, "_output/data")
 
 
+
+
 if __name__ == '__main__':
     args_parser = argparse.ArgumentParser(description='Map processor')
     args_subparsers = args_parser.add_subparsers(help="Available run modes", dest="mode")
@@ -158,3 +165,7 @@ if __name__ == '__main__':
         parse_map_file(config, args.map_file, args.api)
     elif args.mode == "test":
         run_test(config, args.test_data)
+
+
+# download --config D:\Repozytoria\tmp\Home-Assistant-custom-components-Xiaomi-Cloud-Map-Extractor\camera.yaml
+# parse --config D:\Repozytoria\tmp\Home-Assistant-custom-components-Xiaomi-Cloud-Map-Extractor\camera.yaml --map-file D:\Repozytoria\tmp\Home-Assistant-custom-components-Xiaomi-Cloud-Map-Extractor\camera\map_data_viomi.vacuum.v18.gz --api roidmi

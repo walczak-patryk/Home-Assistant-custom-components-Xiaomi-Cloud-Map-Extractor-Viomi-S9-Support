@@ -16,7 +16,7 @@ except ImportError:
 import PIL.Image as Image
 import voluptuous as vol
 from homeassistant.components.camera import Camera, ENTITY_ID_FORMAT, PLATFORM_SCHEMA, SUPPORT_ON_OFF
-from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_TOKEN, CONF_USERNAME
+from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_TOKEN, CONF_USERNAME, CONF_DEVICE_ID
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.entity import generate_entity_id
 from homeassistant.helpers.reload import async_setup_reload_service
@@ -64,6 +64,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_HOST): cv.string,
         vol.Required(CONF_TOKEN): vol.All(str, vol.Length(min=32, max=32)),
+        vol.Required(CONF_DEVICE_ID): cv.string,
         vol.Required(CONF_USERNAME): cv.string,
         vol.Required(CONF_PASSWORD): cv.string,
         vol.Optional(CONF_COUNTRY, default=None): vol.Or(vol.In(CONF_AVAILABLE_COUNTRIES), vol.Equal(None)),
@@ -125,6 +126,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
     host = config[CONF_HOST]
     token = config[CONF_TOKEN]
+    device_id = config[CONF_DEVICE_ID]
     username = config[CONF_USERNAME]
     password = config[CONF_PASSWORD]
     country = config[CONF_COUNTRY]
@@ -146,13 +148,13 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     store_map_path = config[CONF_STORE_MAP_PATH]
     force_api = config[CONF_FORCE_API]
     entity_id = generate_entity_id(ENTITY_ID_FORMAT, name, hass=hass)
-    async_add_entities([VacuumCamera(entity_id, host, token, username, password, country, name, should_poll,
+    async_add_entities([VacuumCamera(entity_id, host, token, device_id, username, password, country, name, should_poll,
                                      image_config, colors, drawables, sizes, texts, attributes, store_map_raw,
                                      store_map_image, store_map_path, force_api)])
 
 
 class VacuumCamera(Camera):
-    def __init__(self, entity_id: str, host: str, token: str, username: str, password: str, country: str, name: str,
+    def __init__(self, entity_id: str, host: str, token: str, device_id: str, username: str, password: str, country: str, name: str,
                  should_poll: bool, image_config: ImageConfig, colors: Colors, drawables: Drawables, sizes: Sizes,
                  texts: Texts, attributes: List[str], store_map_raw: bool, store_map_image: bool, store_map_path: str,
                  force_api: str):
@@ -160,7 +162,7 @@ class VacuumCamera(Camera):
         self.entity_id = entity_id
         self.content_type = CONTENT_TYPE
         self._vacuum = RoborockVacuum(host, token)
-        self._connector = XiaomiCloudConnector(username, password)
+        self._connector = XiaomiCloudConnector(username, password, device_id)
         self._status = CameraStatus.INITIALIZING
         self._device = None
         self._name = name
